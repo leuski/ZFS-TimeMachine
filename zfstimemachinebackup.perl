@@ -36,6 +36,7 @@ my %commandlineoption = JNX::Configuration::newFromDefaults( {
 #																	'destinationhostoptions'				=>	['-c blowfish -C -l root','string'],
 #																	'destinationdataset'					=>	['','string'],
 
+# 																	'sourcehost'							=>	['www.leuski.net','string'],
 																	'sourcehost'							=>	['uranus.local','string'],
 																	'sourcehostoptions'						=>	['-c aes128-ctr -i /Users/anton/.ssh/id_rsa -l anton','string'],
 																	'sourcedataset'							=>	['Oberon/Sanctuary','string'],

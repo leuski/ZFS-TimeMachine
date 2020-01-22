@@ -120,7 +120,7 @@ sub getsnapshotsfordataset
 
 		for (JNX::System::executecommand( %arguments, command => 'zfs list -H -t snapshot -o name -s name -d 1 -r "'.$arguments{dataset}.'"'))
 		{
-			if( /^([A-Za-z0-9\_\-\s\/\.]+)\@(\S+)\s/ )
+			if( /^([A-Za-z0-9\_\-\s\/\.]+)\@(\d{4}-\d{2}-\d{2}-\d{6})\s/ )
 			{
 				print STDERR "Got Snapshot: $arguments{host}: $1\@$2 \n";
 				push(@{$snapshotcache{$arguments{host}}{datasets}{$1}},$2) if length $2>0;
