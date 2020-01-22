@@ -137,9 +137,13 @@ sub executecommand
 
 	return undef if !length($command);
 
+	if( $arguments{sudo} )
+	{
+		$command = 'sudo '.$command;
+	}
 	if( $arguments{host} && ( lc($arguments{host}) ne 'localhost') )
 	{
-		$command = 'ssh '.$arguments{hostoptions}.' '.$arguments{host}." '".$arguments{command}."'";
+		$command = 'ssh '.$arguments{hostoptions}.' '.$arguments{host}." '".$command."'";
 	}
 	if( $arguments{inputfile} || $arguments{outputfile} )
 	{

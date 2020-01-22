@@ -16,24 +16,33 @@
 use strict;
 use POSIX qw(strftime);
 use Data::Dumper;
-
+use FindBin;
+use lib "$FindBin::Bin/.";
 use JNX::ZFS;
 use JNX::System;
 
-$ENV{PATH}=$ENV{PATH}.':/usr/sbin/';
+$ENV{PATH}=$ENV{PATH}.':/usr/sbin/:/usr/local/bin/';
 
 
 
 use JNX::Configuration;
 
 my %commandlineoption = JNX::Configuration::newFromDefaults( {																	
-																	'sourcehost'							=>	['','string'],
-																	'sourcehostoptions'						=>	['-c blowfish -C -l root','string'],
-																	'sourcedataset'							=>	['','string'],
+#																	'sourcehost'							=>	['','string'],
+#																	'sourcehostoptions'						=>	['-c blowfish -C -l root','string'],
+#																	'sourcedataset'							=>	['','string'],
+
+#																	'destinationhost'						=>	['','string'],
+#																	'destinationhostoptions'				=>	['-c blowfish -C -l root','string'],
+#																	'destinationdataset'					=>	['','string'],
+
+																	'sourcehost'							=>	['uranus.local','string'],
+																	'sourcehostoptions'						=>	['-c aes128-ctr -i /Users/anton/.ssh/id_rsa -l anton','string'],
+																	'sourcedataset'							=>	['Oberon/Sanctuary','string'],
 
 																	'destinationhost'						=>	['','string'],
-																	'destinationhostoptions'				=>	['-c blowfish -C -l root','string'],
-																	'destinationdataset'					=>	['','string'],
+																	'destinationhostoptions'				=>	['-c aes128-ctr -l anton','string'],
+																	'destinationdataset'					=>	['Triton/Oberon/Sanctuary','string'],
 
 																	'createsnapshotonsource'				=>	[0,'flag'],
 																	'snapshotstokeeponsource'				=>	[0,'number'],
@@ -43,12 +52,17 @@ my %commandlineoption = JNX::Configuration::newFromDefaults( {
 																	'deletesnapshotsondestination'			=>	[1,'flag'],
 																	'datasetstoignoreonsource'				=>	['','string'],
 
-																	'recursive'								=>	[0,'flag'],
+																	'recursive'								=>	[1,'flag'],
 																	'keepbackupshash'						=>	['24h=>5min,7d=>1h,90d=>1d,1y=>1w,10y=>1month','string'],
 																	'maximumtimeperfilesystemhash'			=>	['.*=>10yrs,.+/(Dropbox|Downloads|Caches|Mail Downloads|Saved Application State|Logs)$=>1month','string'],
 
-																	'verbose'								=>	[0,'flag'],
+																	'verbose'								=>	[1,'flag'],
 																	'debug'									=>	[0,'flag'],
+																	'sudo'									=>	[1,'flag'],
+
+																	'mbuffer'								=>	[1,'flag'],
+																	'sourcembufferoptions'					=>	['-q -v 0 -s 128k -m 1G -O cordelia.local:1337','string'],
+																	'destinationmbufferoptions'				=>	['-q -v 0 -s 128k -m 1G -I 1337','string'],
 															 }, __PACKAGE__ );
 
 $commandlineoption{verbose}=1 if $commandlineoption{debug};
@@ -60,8 +74,8 @@ my $snapshotstokeeponsource					= $commandlineoption{snapshotstokeeponsource};
 my $minimumtimetokeepsnapshotsonsource		= jnxparsesimpletime( $commandlineoption{minimumtimetokeepsnapshotsonsource} );
 my @datasetstoignoreonsource				= split(',',$commandlineoption{datasetstoignoreonsource});
 
-my %source 		= (	host => $commandlineoption{sourcehost}		, hostoptions => $commandlineoption{sourcehostoptions}		, dataset => $commandlineoption{sourcedataset} 		, debug=>$commandlineoption{debug},verbose=>$commandlineoption{verbose});
-my %destination = (	host => $commandlineoption{destinationhost}	, hostoptions => $commandlineoption{destinationhostoptions}	, dataset => $commandlineoption{destinationdataset} , debug=>$commandlineoption{debug},verbose=>$commandlineoption{verbose});
+my %source 		= (	host => $commandlineoption{sourcehost}		, hostoptions => $commandlineoption{sourcehostoptions}		, dataset => $commandlineoption{sourcedataset} 		, debug=>$commandlineoption{debug},verbose=>$commandlineoption{verbose},sudo=>$commandlineoption{sudo});
+my %destination = (	host => $commandlineoption{destinationhost}	, hostoptions => $commandlineoption{destinationhostoptions}	, dataset => $commandlineoption{destinationdataset} , debug=>$commandlineoption{debug},verbose=>$commandlineoption{verbose},sudo=>$commandlineoption{sudo});
 
 
 ####
@@ -238,6 +252,25 @@ DATASET:for my $sourcedataset (@sourcedatasets)
 			}
 
 
+			if ($commandlineoption{mbuffer}) 
+			{
+				$zfssendcommand 	= $zfssendcommand . ' | ' .($commandlineoption{sudo}?'sudo ':undef). 'mbuffer ' . $commandlineoption{sourcembufferoptions};
+				$zfsreceivecommand	= 'mbuffer ' . $commandlineoption{destinationmbufferoptions} . ' | ' .($commandlineoption{sudo}?'sudo ':undef). $zfsreceivecommand;
+
+				if( 0 == ( my $pid = fork() ) )
+				{
+					die "Can't execute $zfsreceivecommand" if !defined(JNX::System::executecommand(%destination, command=>$zfsreceivecommand));
+					exit;
+				}
+				else
+				{
+					die "Could not fork zfs send" if $pid<0
+				}
+				
+				sleep 2;
+				die "Can't execute $zfssendcommand" if !defined(JNX::System::executecommand(%source, command=> $zfssendcommand));
+			}
+			else
 			{
 				# workaround is needed as the 2012-01-13 panics the machine if zfs send pipes to zfs receive
 
